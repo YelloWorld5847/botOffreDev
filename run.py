@@ -1,4 +1,4 @@
-﻿import sys
+import sys
 import os
 
 # Enable UTF-8 for console output on Windows
@@ -112,15 +112,108 @@ def show_history():
 
     console.print(table)
 
+async def check_token_cmd():
+    from auth import get_token_info
+    tok = settings.creators_area_token
+    if not tok:
+        console.print("[red]Aucun token CREATORS_AREA_TOKEN configure dans .env[/red]")
+        return
+    info = get_token_info(tok)
+    if not info:
+        console.print("[yellow]Format de token non reconnu (non JWT). Test de connexion...[/yellow]")
+        await bot.verify_connection()
+        return
+
+    console.print("\n[bold]Informations sur le token actuel :[/bold]")
+    console.print(f"Email : [cyan]{info.get('email')}[/cyan]")
+    console.print(f"Discord ID : [cyan]{info.get('discord_id')}[/cyan]")
+    console.print(f"Expiration : [cyan]{info.get('exp')}[/cyan]")
+
+    rem = info.get('remaining_hours', 0)
+    if info.get('is_expired'):
+        console.print(f"[bold red]Statut : EXPIRE (depuis {abs(int(rem))}h)[/bold red]")
+    else:
+        console.print(f"[bold green]Statut : VALIDE (reste environ {int(rem)}h)[/bold green]")
+
+    if settings.discord_user_token:
+        console.print("[dim]Token Discord configure dans .env (auto-refresh actif).[/dim]\n")
+    else:
+        console.print("[dim]DISCORD_USER_TOKEN non renseigne dans .env.[/dim]\n")
+
+async def set_token_cmd(new_token: str):
+    from auth import update_env_variable, restart_pm2_if_available
+    from client import CreatorsAreaClient
+    tok = new_token.strip().strip('"').strip("'")
+    if not tok:
+        console.print("[red]Le token fourni est vide.[/red]")
+        return
+
+    console.print("[cyan]Verification du nouveau token...[/cyan]")
+    test_client = CreatorsAreaClient(token=tok)
+    try:
+        user_info = await test_client.get_me()
+        name = user_info.get('name', 'Inconnu')
+        console.print(f"[bold green]Token valide pour :[/bold green] [yellow]{name}[/yellow]")
+    except Exception as e:
+        console.print(f"[bold red]Token invalide :[/bold red] {e}")
+        return
+
+    update_env_variable("CREATORS_AREA_TOKEN", tok)
+    settings.creators_area_token = tok
+    console.print("[green]Token enregistre dans .env avec succes.[/green]")
+
+    if restart_pm2_if_available():
+        console.print("[green]Processus PM2 creators-bot redemarre automatiquement.[/green]")
+    else:
+        console.print("[dim]Si le bot tourne sous PM2, executez : pm2 restart creators-bot --update-env[/dim]")
+
+async def refresh_token_cmd(custom_discord_token: Optional[str] = None):
+    from auth import login_with_discord, restart_pm2_if_available, update_env_variable
+    discord_tok = custom_discord_token or settings.discord_user_token
+    if not discord_tok:
+        console.print("[red]Aucun token Discord fourni. Ajoutez DISCORD_USER_TOKEN dans votre .env ou passez-le en parametre.[/red]")
+        return
+
+    console.print("[cyan]Connexion a CreatorsArea via Discord OAuth...[/cyan]")
+    ok, res = await login_with_discord(discord_tok)
+    if not ok:
+        console.print(f"[bold red]Echec de la connexion Discord :[/bold red] {res}")
+        return
+
+    if custom_discord_token and custom_discord_token != settings.discord_user_token:
+        update_env_variable("DISCORD_USER_TOKEN", custom_discord_token)
+        settings.discord_user_token = custom_discord_token
+
+    console.print("[bold green]Nouveau token CreatorsArea genere et enregistre avec succes.[/bold green]")
+    if restart_pm2_if_available():
+        console.print("[green]Processus PM2 redemarre automatiquement.[/green]")
+    else:
+        console.print("[dim]Si le bot tourne sous PM2, executez : pm2 restart creators-bot --update-env[/dim]")
+
 def main():
     parser = argparse.ArgumentParser(description="Bot CreatorsArea Auto-Apply")
-    parser.add_argument('--dry-run', action='store_true', help="Exécuter en mode simulation sans postuler")
-    parser.add_argument('--live', action='store_true', help="Exécuter en mode réel avec candidatures directes")
-    parser.add_argument('--test-token', action='store_true', help="Tester la validité du token utilisateur")
-    parser.add_argument('--test-eval', action='store_true', help="Tester l'évaluateur sur les offres du fichier HAR")
-    parser.add_argument('--use-ai', action='store_true', help="Activer l'appel IA lors du test d'évaluation")
+    parser.add_argument('--dry-run', action='store_true', help="Executer en mode simulation sans postuler")
+    parser.add_argument('--live', action='store_true', help="Executer en mode reel avec candidatures directes")
+    parser.add_argument('--test-token', action='store_true', help="Tester la validite du token utilisateur")
+    parser.add_argument('--test-eval', action='store_true', help="Tester l'evaluateur sur les offres du fichier HAR")
+    parser.add_argument('--use-ai', action='store_true', help="Activer l'appel IA lors du test d'evaluation")
     parser.add_argument('--history', action='store_true', help="Afficher l'historique des candidatures en base")
+    parser.add_argument('--check-token', action='store_true', help="Afficher les informations et date d'expiration du token")
+    parser.add_argument('--set-token', type=str, metavar="TOKEN", help="Definir un nouveau token CreatorsArea et l'enregistrer dans .env")
+    parser.add_argument('--refresh-token', nargs='?', const='', metavar="DISCORD_TOKEN", help="Rafraichir le token via Discord OAuth")
     args = parser.parse_args()
+
+    if args.set_token:
+        asyncio.run(set_token_cmd(args.set_token))
+        return
+
+    if args.refresh_token is not None:
+        asyncio.run(refresh_token_cmd(args.refresh_token if args.refresh_token != '' else None))
+        return
+
+    if args.check_token:
+        asyncio.run(check_token_cmd())
+        return
 
     if args.test_eval:
         asyncio.run(test_evaluator_on_har(use_ai=args.use_ai))
@@ -138,7 +231,7 @@ def main():
     try:
         asyncio.run(bot.run_loop(dry_run=dry_run))
     except KeyboardInterrupt:
-        console.print("\n[yellow]Arrêt du bot par l'utilisateur.[/yellow]")
+        console.print("\n[yellow]Arret du bot par l'utilisateur.[/yellow]")
 
 if __name__ == '__main__':
     main()

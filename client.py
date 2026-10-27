@@ -1,4 +1,4 @@
-﻿import httpx
+import httpx
 import logging
 from typing import List, Dict, Any, Optional
 from models import Offer
@@ -24,14 +24,38 @@ class CreatorsAreaClient:
             headers['Cookie'] = f"creators_area_token={self.token}"
         return headers
 
+    async def refresh_token_if_needed(self) -> bool:
+        from auth import get_token_info, login_with_discord
+        info = get_token_info(self.token)
+        needs_refresh = (not self.token) or (info and info.get("remaining_hours", 0) < 2.0)
+        if needs_refresh and settings.discord_user_token:
+            logger.info("Tentative de rafraichissement du token via Discord...")
+            ok, res = await login_with_discord(settings.discord_user_token)
+            if ok:
+                self.token = res
+                return True
+            else:
+                logger.warning(f"Echec rafraichissement token Discord: {res}")
+        return False
+
     async def get_me(self) -> Dict[str, Any]:
+        await self.refresh_token_if_needed()
         url = f"{self.BASE_URL}/api/me"
         async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
             resp = await client.get(url, headers=self._get_headers())
             if resp.status_code in (200, 304):
                 return resp.json()
             elif resp.status_code == 401:
-                raise PermissionError("Token d'authentification expiré ou invalide.")
+                # retry once if discord token available
+                if settings.discord_user_token:
+                    from auth import login_with_discord
+                    ok, res = await login_with_discord(settings.discord_user_token)
+                    if ok:
+                        self.token = res
+                        retry_resp = await client.get(url, headers=self._get_headers())
+                        if retry_resp.status_code in (200, 304):
+                            return retry_resp.json()
+                raise PermissionError("Token d'authentification expire ou invalide.")
             else:
                 resp.raise_for_status()
 
@@ -83,7 +107,17 @@ class CreatorsAreaClient:
                     pass
                 raise ValueError(f"Impossible de postuler: {error_msg}")
             elif resp.status_code == 401:
-                raise PermissionError("Token expiré lors de la postulation.")
+                if settings.discord_user_token:
+                    from auth import login_with_discord
+                    ok, res = await login_with_discord(settings.discord_user_token)
+                    if ok:
+                        self.token = res
+                        headers = self._get_headers(referer=f"{self.BASE_URL}/offres/{slug}")
+                        headers['Content-Type'] = 'application/json'
+                        retry_resp = await client.post(url, json=payload, headers=headers)
+                        if retry_resp.status_code in (200, 201):
+                            return retry_resp.json()
+                raise PermissionError("Token expire lors de la postulation.")
             else:
                 resp.raise_for_status()
 

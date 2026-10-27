@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "CreatorsArea Token Extractor",
+  "version": "1.0",
+  "description": "Recupere en un clic votre token de session CreatorsArea pour le bot.",
+  "permissions": [
+    "cookies"
+  ],
+  "host_permissions": [
+    "*://creatorsarea.fr/*",
+    "*://*.creatorsarea.fr/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "CreatorsArea Token"
+  }
+}

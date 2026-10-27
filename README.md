@@ -1,111 +1,78 @@
-﻿# 🤖 Bot Auto-Postulation CreatorsArea (Freelance Développeur)
+# Bot Auto-Postulation CreatorsArea
 
-Ce bot surveille en continu et en temps réel les nouvelles offres de développement publiées sur **CreatorsArea.fr**, filtre intelligemment les missions selon vos compétences (Code pur, Web, Bots, Scraping, API, SaaS, Automatisation) et **postule automatiquement et instantanément** avec votre portfolio.
+Ce bot surveille en temps reel les offres de developpement publiees sur creatorsarea.fr, filtre les missions selon vos competences (Web, Bots, Scraping, API, SaaS, Automatisation) et postule automatiquement avec votre portfolio.
 
----
+## Installation
 
-## ⚡ Caractéristiques Principales
+1. Cloner ou ouvrir le dossier du projet :
+```bash
+cd botOffreDev
+```
 
-- 🚀 **Candidature Ultra-Rapide** : Détection et postulation dès la première seconde de publication d'une offre.
-- 🎯 **Filtrage Intelligent des Compétences** :
-  - ✅ **Inclus (Code Pur & IA)** : Sites web (React, Vue, Next.js, WordPress, etc.), Bots (Discord, Telegram, Vinted), Web Scraping, Scripts Python, Backend (Node, FastAPI, Laravel), SaaS, Extensions Chrome, DevOps.
-  - ❌ **Exclus (Jeux / Modding / Graphisme)** : FiveM, GTA V, GMod, Roblox, Minecraft, DayZ, Hytale, Modélisation 3D / Blender, Level Design, Graphisme pur sans code.
-- 💬 **Notifications Discord Webhook Riches** : Alertes instantanées sur votre serveur avec embed détaillé (titre, prix, tags, lien direct vers l'offre).
-- 💾 **Mémoire & Anti-Doublon** : Base de données locale SQLite (`offers.db`) pour ne jamais repostuler deux fois à la même offre.
-- 🛡️ **Mode Simulation (Dry-Run)** : Permet de tester le comportement du bot sans envoyer de vraies candidatures sur le site.
-- 🤖 **Validation IA Optionnelle** : Possibilité d'activer une validation supplémentaire par IA (Gemini, OpenAI, Groq).
+2. Installer les dependances :
+```bash
+pip install -r requirements.txt
+```
 
----
+## Gestion des Tokens et Authentification
 
-## 📦 Installation
+Le token CreatorsArea expire au bout de 7 jours. Vous avez 3 methodes pour le gerer facilement :
 
-1. **Cloner ou ouvrir le dossier du projet** :
-   ```bash
-   cd botOffreDev
-   ```
+### Methode 1 : Connexion automatique via Token Discord (Recommande)
 
-2. **Installer les dépendances** :
-   ```bash
-   pip install -r requirements.txt
-   ```
-
----
-
-## ⚙️ Configuration (`.env`)
-
-Copiez le fichier `.env.example` en `.env` et ajustez vos paramètres :
-
+Ajoutez votre token utilisateur Discord dans `.env` :
 ```env
-# Token d'authentification 'creators_area_token'
-CREATORS_AREA_TOKEN=eyJhbGciOiJIUzI1NiIsInR5...
-
-# Lien de votre portfolio ou profil GitHub envoyé lors de la candidature
-PORTFOLIO_URL=https://github.com/YelloWorld5847/
-
-# Intervalle de vérification en secondes (10s recommandé)
-POLL_INTERVAL_SECONDS=10
-
-# Accepter les offres bénévoles (true/false)
-ALLOW_VOLUNTEER=true
-
-# Budget minimum en euros pour postuler (0 = tout accepter)
-MIN_PRICE=0
-
-# URL de votre Webhook Discord (laisser vide si désactivé)
-DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...
-
-# Mode Dry-Run (true = simulation, false = candidatures réelles)
-DRY_RUN=false
+DISCORD_USER_TOKEN=votre_token_discord
 ```
+Le bot effectuera automatiquement le handshake OAuth Discord des que le token CreatorsArea expire. Vous n'avez rien a faire manuellement.
 
-### 🔑 Comment récupérer votre token CreatorsArea ?
-1. Rendez-vous sur [creatorsarea.fr](https://creatorsarea.fr) et connectez-vous avec votre compte Discord.
-2. Ouvrez la console du navigateur (`F12` ou `Ctrl + Maj + I`) > Onglet **Application** (ou **Stockage**) > **Cookies** > `https://creatorsarea.fr`.
-3. Copiez la valeur du cookie `creators_area_token` et collez-la dans votre `.env`.
-
----
-
-## 🚀 Utilisation
-
-### 1. Tester la connexion à votre compte
+Pour tester le renouvellement immediat :
 ```bash
-python run.py --test-token
+python run.py --refresh-token
 ```
 
-### 2. Tester le filtre sur les offres d'exemple
+### Methode 2 : Commande rapide de mise a jour
+
+Pour mettre a jour le token CreatorsArea sans editer le fichier a la main :
 ```bash
-python run.py --test-eval
+python run.py --set-token <NOUVEAU_TOKEN>
+```
+La commande verifie la validite du token, l'enregistre dans `.env` et relance le processus PM2 si present.
+
+Pour verifier l'etat et le temps restant du token actuel :
+```bash
+python run.py --check-token
 ```
 
-### 3. Lancer en mode Simulation (Dry-Run)
+### Methode 3 : Favori de navigateur (Bookmarklet 1 clic)
+
+Creez un favori dans Chrome/Firefox avec cette URL :
+```javascript
+javascript:(function(){const m=document.cookie.match(/creators_area_token=([^;]+)/);if(!m){alert("Non connecte sur CreatorsArea");return;}const t=m[1];navigator.clipboard.writeText("python run.py --set-token "+t);alert("Commande copiee dans le presse-papier :\npython run.py --set-token "+t.substring(0,20)+"...");})();
+```
+En cliquant sur ce favori lorsque vous etes sur creatorsarea.fr, la commande complete `python run.py --set-token ...` est copiee dans votre presse-papier. Il ne reste plus qu'a la coller dans votre terminal.
+
+### Methode 4 : Extension Chrome
+
+Le dossier `extension/` contient une extension Chrome non compressee.
+1. Rendez-vous sur `chrome://extensions/`
+2. Activez le mode developpeur.
+3. Cliquez sur "Charger l'extension non empaquetee" et selectionnez le dossier `botOffreDev/extension`.
+4. Sur creatorsarea.fr, cliquez sur l'icone de l'extension pour copier le token ou la commande.
+
+## Commandes d'execution
+
+### Mode Simulation (Dry-Run)
 ```bash
 python run.py --dry-run
 ```
 
-### 4. Lancer en direct (Postulation réelle automatique)
+### Mode Reel
 ```bash
 python run.py --live
 ```
 
-### 5. Consulter l'historique des offres traitées
+### Historique
 ```bash
 python run.py --history
-```
-
----
-
-## 🖥️ Lancer en tâche de fond (VPS / Linux / Windows)
-
-### Sur Linux (avec PM2 ou Systemd)
-```bash
-# Avec PM2 :
-pm2 start "python run.py --live" --name creatorsarea-bot
-```
-
-### Sur Windows
-Vous pouvez simplement lancer le script dans un terminal PowerShell ou créer un fichier `.bat` :
-```bat
-@echo off
-python run.py --live
-pause
 ```

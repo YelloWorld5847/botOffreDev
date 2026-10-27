@@ -19,5 +19,6 @@ class Settings(BaseModel):
     ai_provider: str = os.getenv('AI_PROVIDER', 'none').lower().strip()
     ai_api_key: str = os.getenv('AI_API_KEY', '').strip()
     ai_model: str = os.getenv('AI_MODEL', '').strip()
+    discord_user_token: str = os.getenv('DISCORD_USER_TOKEN', '').strip()
 
 settings = Settings()
