@@ -16,6 +16,7 @@ import base64
 from pathlib import Path
 from rich.console import Console
 from rich.table import Table
+from typing import Optional
 from models import Offer
 from config import settings
 from bot import bot
